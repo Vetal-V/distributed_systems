@@ -1,6 +1,6 @@
 ## Distributed Systems Seminars: Introduction
 
-- To run the application you need to use `Python` version 3.7 and higher. The Python version can be checked by the command:
+- To run the application you need to use `Python` version 3.7 or higher. The Python version can be checked by the command:
     ```
     python -V
     ```
