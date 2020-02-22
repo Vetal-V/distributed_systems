@@ -15,3 +15,7 @@
     ```
     python app.py
     ```
+- To run the bonus task project, execute the following command:
+    ```
+    python bonus_task.py
+    ```
