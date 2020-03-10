@@ -37,7 +37,7 @@
         Enter the message: Hi! How are you?
         Message sent successfully.
         ```
-    - file - send file to user. After entering the command, the program will ask you to enter name of receiver, name of file and path to file (for example file.txt with path ./file.txt). User with this name immediately receive notification about waiting file:
+    - `file` - send file to user. After entering the command, the program will ask you to enter name of receiver, name of file and path to file (for example file.txt with path ./file.txt). User with this name immediately receive notification about waiting file:
         ```
         Enter the command (help - list of available commands):
         file
@@ -47,7 +47,7 @@
         Enter the path to file: ./file.txt
         File sent successfully.
         ```
-    - recMsg - receive message for login user (after  logging in to the user2 account, I received a notification about the file and the messages received. Account user2 must be created):
+    - `recMsg` - receive message for login user (after  logging in to the user2 account, I received a notification about the file and the messages received. Account user2 must be created):
         ```
         Enter the command (help - list of available commands):
         recMsg
@@ -56,7 +56,7 @@
          Sender: user1
          Message: Hi! How are you?
         ```
-    - recFile - receive file for login user:
+    - `recFile` - receive file for login user:
         ```
         Enter the command (help - list of available commands):
         You have waiting file: 1. To see waiting file enter the command recFile.
