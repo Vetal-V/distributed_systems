@@ -31,9 +31,7 @@ public class Main {
     public static void sleeper (int timeSl){ //method for implementing delays
         try {
             Thread.sleep(timeSl);
-        } catch (Exception e) {
-            System.out.println(e);
-        }
+        } catch (Exception ignored) {}
     }
 
     public static void errorHandler (byte errCode){ //method for handling errors
@@ -129,7 +127,7 @@ public class Main {
                             byte[] result = baos.toByteArray();
 
                             String res = new String(result, StandardCharsets.US_ASCII);
-                            System.out.println("Recieved from server: " + res);
+                            System.out.println("Received from server: " + res);
                             break;
 
                         case "login": //command login
@@ -152,13 +150,12 @@ public class Main {
                             int loginBuffer = input.readInt(); //receive size of buffer
                             byte loginAns = input.readByte(); //receive answer
                             System.out.println("Server answer: ");
-                            if (loginAns == 6) { //check whether new user
+                            if (loginAns == 6) //check whether new user
                                 System.out.println("New user. Successful registration.");
-                            } else if (loginAns == 7) { //check whether just login
+                            else if (loginAns == 7) //check whether just login
                                 System.out.println("Successful login.");
-                            } else {
+                            else
                                 errorHandler(loginAns); //error handler
-                            }
                             if (loginAns == 6 || loginAns == 7){
                                 NewThread newTread = new NewThread(clientSocket);
                                 newTread.start();
@@ -190,8 +187,7 @@ public class Main {
                                 }
                                 System.out.print("List of active user name: ");
                                 assert ress != null;
-                                //print active devices
-                                for (String s : ress) System.out.print(s + " ");
+                                for (String s : ress) System.out.print(s + " "); //print active devices
                             }
                             break;
 
@@ -259,9 +255,7 @@ public class Main {
                                 output.writeByte(20); //sent ID
                                 output.write(fileSerial); //sent object array to server
                                 output.flush(); //providing write data to a buffered stream
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
+                            } catch (IOException ignored) {}
 
                             sleeper(500); //delay
 
@@ -275,7 +269,6 @@ public class Main {
 
                         case "recFile": //command receive file
                             System.out.println("You choose the command receive file.");
-                            //print file information
                             if(NewThread.countFile == 0) //no file
                                 System.out.println("You don't have waiting file.");
                             else if (NewThread.countFile == 1){ // one waiting file
@@ -286,7 +279,7 @@ public class Main {
                                 String fileContStr = new String(fileContByte);
                                 try (FileWriter writer = new FileWriter("receiveFile/" + NewThread.nameFile[0], false)) //try to write content to file
                                 {
-                                    writer.write(fileContStr); //print content
+                                    writer.write(fileContStr); //print content to file
                                     writer.flush(); //providing write data to a buffered stream
                                 }
                                 catch(IOException ex) { //catch error
@@ -309,7 +302,7 @@ public class Main {
                                     catch(IOException ex) { //catch error
                                         System.out.println(ex.getMessage());
                                     }
-                                    System.out.println("The content was written to a file " + NewThread.nameFile[i] + " at path /receiveFile/" + NewThread.nameFile[i]);
+                                    System.out.println("The content was written to a file " + NewThread.nameFile[i] + " at path /receiveFile/" + NewThread.nameFile[i]+".");
                                 }
                                 NewThread.countFile = 0;
                             }
@@ -392,8 +385,7 @@ class NewThread extends Thread { //class for initialization new thread
                         String[] msgResult = null;
                         try { //try deserialize message
                             msgResult = Main.deserialize(buffer, 0, String[].class);
-                        } catch (Exception ignored) {
-                        }
+                        } catch (Exception ignored) {}
                         //print message about new message
                         countMsg++;
                         System.out.println("You have unread message: " + countMsg + ". To see the message enter the command recMsg.");
@@ -401,6 +393,7 @@ class NewThread extends Thread { //class for initialization new thread
                         senderMsg[countMsg - 1] = msgResult[0]; //record to array
                         messageMsg[countMsg - 1] = msgResult[1];
                     }
+
                     //check new file
                     output.writeInt(1); //sent size of buffer
                     output.writeByte(30); //sent ID
