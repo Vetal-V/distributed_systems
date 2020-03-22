@@ -2,11 +2,11 @@
 
 1. To run server and client you need use `Java` version `1.8` or higher and `Maven` tool.
 
-2. First of all you have to start the server. To do this, run the following command in folder with TCPsocket, for which you can specify your IP-address and port (for example):
+2. First of all you have to start the server. To do this, run the following command in console or terminal from folder with rmi server. You can omit the argument, but also start server with your specify your port (for example):
     ```
-    mvn clean compile exec:java -D exec.args="127.0.0.1 4000"
+    mvn clean compile exec:java -D exec.args="4000"
     ```
-3. Then you can start the client. To do this, run the same command with the same argument as for the server in folder with client (for example):
+3. Then you can start the client. To do this, run the same command  in console or terminal with the same port as for the server in folder with client (for example):
     ```
     mvn clean compile exec:java -D exec.args="127.0.0.1 4000"
     ```
