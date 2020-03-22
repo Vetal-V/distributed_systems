@@ -81,64 +81,64 @@ class CommandHandler{
                     break;
 
                 case "list": //command list
-                    System.out.println("You choose the command list.");
+                    System.out.println(" You choose the command list.");
 
                     String[] listUsers = null;
                     try{
                         listUsers = proxy.listUsers(loginId); //call the method listUsers of class IServer
                     } catch(RemoteException ex) {
-                        System.out.println("This command requires login first.");
+                        System.out.println(" This command requires login first.");
                         System.out.println(ex.getMessage());
                     }
 
                     if (listUsers != null){ //print the list of active user
-                        System.out.print("List of active user name: ");
+                        System.out.print(" List of active user name: ");
                         for (String s : listUsers) System.out.print(s + " ");
                     }
                     System.out.println();
                     break;
 
                 case "msg": //command msg
-                    System.out.println("You choose the command msg.");
-                    System.out.print("Enter the login of receiver: ");
+                    System.out.println(" You choose the command msg.");
+                    System.out.print(" Enter the login of receiver: ");
                     String msgLogin = br.readLine(); //read login of receiver from user
-                    System.out.print("Enter the message: ");
+                    System.out.print(" Enter the message: ");
                     String msgText = br.readLine(); //read message from user
 
                     IServer.Message msg =  new IServer.Message(msgLogin,  msgText); //create the object of class Message
                     try{
                         proxy.sendMessage(loginId, msg); //call the method sendMessage of class IServer
-                        System.out.println("Message sent successfully.");
+                        System.out.println(" Message sent successfully.");
                     } catch(RemoteException ex) {
-                        System.out.println("This command requires login first.");
+                        System.out.println(" This command requires login first.");
                         System.out.println(ex.getMessage());
                     }
                     break;
 
                 case "recMsg": //command receive message
-                    System.out.println("You choose the command receive message.");
+                    System.out.println(" You choose the command receive message.");
                     if (ReceiveTimer.getCountMsg() == 0){ //no message
-                        System.out.println("You don't have message.");
+                        System.out.println(" You don't have message.");
                     } else if(ReceiveTimer.getCountMsg() == 1){ //one message
-                        System.out.println("You have the message:");
-                        System.out.println(" Sender: " + ReceiveTimer.recMsg[0].getSender());
-                        System.out.println(" Message: " + ReceiveTimer.recMsg[0].getMessage());
+                        System.out.println(" You have the message:");
+                        System.out.println("  Sender: " + ReceiveTimer.recMsg[0].getSender());
+                        System.out.println("  Message: " + ReceiveTimer.recMsg[0].getMessage());
                         ReceiveTimer.setCountMsg(0); //reset the counter
                     } else { //more then one message
-                        System.out.println("You have messages:");
+                        System.out.println(" You have messages:");
                         for(int i = 0; i < ReceiveTimer.getCountMsg(); i++ ) {
-                            System.out.println(" Sender: " + ReceiveTimer.recMsg[i].getSender());
-                            System.out.println(" Message: " + ReceiveTimer.recMsg[i].getMessage() + "\n");
+                            System.out.println("  Sender: " + ReceiveTimer.recMsg[i].getSender());
+                            System.out.println("  Message: " + ReceiveTimer.recMsg[i].getMessage() + "\n");
                         }
                         ReceiveTimer.setCountMsg(0); //reset the counter
                     }
                     break;
 
                 case "file": //command file
-                    System.out.println("You choose the command file.");
-                    System.out.print("Enter the login of receiver: ");
+                    System.out.println(" You choose the command file.");
+                    System.out.print(" Enter the login of receiver: ");
                     String fileReceiver = br.readLine(); //read login of receiver from user
-                    System.out.print("Enter the path to file: ");
+                    System.out.print(" Enter the path to file: ");
                     String filePath = br.readLine(); //read the path to file from user
 
                     File file = new File(filePath); //create the object of class File
@@ -146,46 +146,46 @@ class CommandHandler{
                         IServer.FileInfo fileInfo = new IServer.FileInfo(fileReceiver, file); //create the object of class FileInfo
                         try{
                             proxy.sendFile(loginId, fileInfo); //call the method sendFile of class IServer
-                            System.out.println("File sent successfully.");
+                            System.out.println(" File sent successfully.");
                         }catch(RemoteException ex) {
-                            System.out.println("This command requires login first.");
+                            System.out.println(" This command requires login first.");
                             System.out.println(ex.getMessage());
                         }
 
                     } else
-                        System.out.println("Wrong path to the file. Please, try again.");
+                        System.out.println(" Wrong path to the file. Please, try again.");
                     break;
 
                 case "recFile": //command receive file
-                    System.out.println("You choose the command receive file.");
+                    System.out.println(" You choose the command receive file.");
                     String pathFile = "./receiveFile/"; //path to received file
 
                     if (ReceiveTimer.getCountFile() == 0) //no file
-                        System.out.println("You don't have waiting file.");
+                        System.out.println(" You don't have waiting file.");
                     else {
                         File folderPath = new File(pathFile); //create object of class File
                         if (!folderPath.exists()){ //create folder if not exist
                             boolean dirCreated = folderPath.mkdirs();
                             if (dirCreated){
-                                System.out.println("Folder for files was created.");
+                                System.out.println(" Folder for files was created.");
                             }
                         } else if (ReceiveTimer.getCountFile() == 1){ // one waiting file
-                            System.out.println("You have waiting file:");
-                            System.out.println("Sender of file: " + ReceiveTimer.recFile[0].getSender());
+                            System.out.println(" You have waiting file:");
+                            System.out.println("  Sender of file: " + ReceiveTimer.recFile[0].getSender());
                             String fileName = ReceiveTimer.recFile[0].getFilename();
-                            System.out.println("Filename: " + fileName);
+                            System.out.println("  Filename: " + fileName);
                             ReceiveTimer.recFile[0].saveFileTo(folderPath); //call the method saveFileTo of class IServer
-                            System.out.println("The content was written to a file " + fileName + " at path /receiverFile/" + fileName);
+                            System.out.println(" The content was written to a file " + fileName + " at path /receiverFile/" + fileName);
                             ReceiveTimer.setCountFile(0); //reset the counter
                         } else { //more than one file
                             String[] fileNames = new String[ReceiveTimer.getCountFile()+1];
-                            System.out.println("You have waiting files:");
+                            System.out.println(" You have waiting files:");
                             for (int i = 0; i < ReceiveTimer.getCountFile(); i++) {
                                 fileNames[i] = ReceiveTimer.recFile[i].getFilename();
-                                System.out.println("Sender of file: " + ReceiveTimer.recFile[i].getSender());
-                                System.out.println("Filename: " + fileNames[i]);
+                                System.out.println("  Sender of file: " + ReceiveTimer.recFile[i].getSender());
+                                System.out.println("  Filename: " + fileNames[i]);
                                 ReceiveTimer.recFile[i].saveFileTo(folderPath); //call the method saveFileTo of class IServer
-                                System.out.println("The content was written to a file " + fileNames[i] + " at path /receiveFile/" + fileNames[i]);
+                                System.out.println(" The content was written to a file " + fileNames[i] + " at path /receiveFile/" + fileNames[i]);
                             }
                             ReceiveTimer.setCountFile(0); //reset the counter
                         }
