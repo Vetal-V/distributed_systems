@@ -285,7 +285,7 @@ public class Main {
                                 catch(IOException ex) { //catch error
                                     System.out.println(ex.getMessage());
                                 }
-                                System.out.println("The content was written to a file " + NewThread.nameFile[0] + "at path /receiverFile" + NewThread.nameFile[0]);
+                                System.out.println("The content was written to a file " + NewThread.nameFile[0] + " at path /receiverFile/" + NewThread.nameFile[0]);
                                 NewThread.countFile = 0; //reset the counter
                             } else { //more than one file
                                 System.out.println("You have waiting files:");
