@@ -325,7 +325,7 @@ class ReceiveTimer extends TimerTask {
 
             if(current.size() > old.size()){ //new user
                 current.removeAll(old);
-                System.out.println("The user " + current.get(0) + " connected to the server.");
+                System.out.print("The user " + current.get(0) + " connected to the server.");
 
                 //bonus task
                 Message msg = new Message(); //create the object of class Message
@@ -333,7 +333,7 @@ class ReceiveTimer extends TimerTask {
                 msg.setReceiver(current.get(0)); //set the receiver of message
                 try {
                     serverProxy.sendMessage(sectionId, msg); //call the method sendMessage of interface IChatServer
-                    System.out.println("Message sent successfully.");
+                    System.out.println(" Welcome message sent successfully.");
                 } catch (ArgumentFault | ServerFault ex) {
                     System.out.println(ex.getMessage());
                 }
