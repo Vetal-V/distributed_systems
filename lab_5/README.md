@@ -1,4 +1,4 @@
-## Distributed Systems Seminars: 3. Remote Method Invocation
+## Distributed Systems Seminars: 4. SOAP Web Services
 
 1. To run server and client you need use `Java` version `1.8` or higher and `Maven` tool.
 
