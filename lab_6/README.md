@@ -80,7 +80,7 @@
          The content was written to a file file.txt at path ./receiverFile/file.txt
         ```
       
-5. Application prints when some new user logs in to the server and logs out of the server:
+5. Application prints when some new user logs in to the server:
     - To check it you need to log in to several accounts from different terminals:
     ``` 
     ~~~Terminal_1~~~
