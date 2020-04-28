@@ -210,7 +210,7 @@ public class CommandHandler implements Closeable {
                                     .post(fileInfoEntity); //file sent command to server
 
                             if (fileSentResponse.getStatus() == 201) {
-                                System.out.println("The message is processed.");
+                                System.out.println("The file is processed.");
                             } else {
                                 responseError(fileSentResponse.getStatus()); //run method for other error code
                             }
