@@ -4,7 +4,7 @@
 
 2. First of all you have to start the server. To do this, run the following command in console or terminal from folder with soap server. You can omit the argument, but also start server with your specify your ip address and port (for example):
     ```
-    mvn clean compile exec:java -D exec.args=""localhost 8080""
+    mvn clean compile exec:java -D exec.args="localhost 8080"
     ```
 3. Then you can start the client. To do this, run the command below in console or terminal with url of the server in folder with client (in this case):
     ```
