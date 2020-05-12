@@ -302,7 +302,7 @@ public class CommandHandler implements Closeable {
 
                         File file = new File(filePath);
                         if (!file.isFile()) { //check existence of file
-                            System.out.println("Incorrect file path or it is not a file.\n");
+                            System.out.println("Incorrect file path or it is not a file.");
                             return;
                         }
 
