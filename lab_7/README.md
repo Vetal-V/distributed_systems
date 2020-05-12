@@ -18,8 +18,7 @@
         Enter the command (help - list of available commands):
         ping
          You choose the command ping.
-        Received from server: Ping successful..
-        Ping successful.
+        Received from server: Ping successful.
         ```
     - `echo` - testing sending message. After entering the command, the program will ask you to enter text of echo message:
         ```
