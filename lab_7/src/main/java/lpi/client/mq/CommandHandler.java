@@ -2,22 +2,25 @@ package lpi.client.mq;
 
 import javax.jms.*;
 import java.io.*;
-import java.util.*;
+import java.nio.file.Files;
 import javax.jms.JMSException;
 import javax.jms.TextMessage;
+import lpi.server.mq.FileInfo;
 
 public class CommandHandler implements Closeable {
 
     private boolean loginCheck = false; //boolean variable for checking log in
-    private String targetUrl; //target URL of server
-    private Timer timer; //object class of Timer
 
     private javax.jms.Session session;
+    private javax.jms.Session sessionListener;
     private javax.jms.Connection connection;
+    private MessageConsumer messageConsumer;
+    private MessageConsumer fileConsumer;
 
-    CommandHandler(javax.jms.Session session, javax.jms.Connection connection){ //constructor of class CommandHandler
+    CommandHandler(javax.jms.Session session, javax.jms.Connection connection, javax.jms.Session sessionListener){ //constructor of class CommandHandler
         this.session = session;
         this.connection = connection;
+        this.sessionListener = sessionListener;
     }
 
     private synchronized javax.jms.Message getResponse(javax.jms.Message msg, String queueName) throws JMSException {
@@ -56,9 +59,24 @@ public class CommandHandler implements Closeable {
     boolean checkLogin(boolean loginCheck){ //method to check the logging of user
         if (loginCheck)
             return true;
-        else
+        else {
+            System.out.println("This command requires login first.");
             return false;
+        }
     }
+
+    public void checkMsg() throws JMSException {
+        Destination queue = sessionListener.createQueue("chat.messages");
+        messageConsumer = sessionListener.createConsumer(queue);
+        messageConsumer.setMessageListener(new MessageReceiver());
+    }
+
+    public void chechFile() throws JMSException {
+        Destination queue = sessionListener.createQueue("chat.files");
+        fileConsumer = sessionListener.createConsumer(queue);
+        fileConsumer.setMessageListener(new FileReceiver());
+    }
+
 
     void run() throws IOException, JMSException { //method run of class CommandHandler
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));  //input buffer stream from user
@@ -80,6 +98,12 @@ public class CommandHandler implements Closeable {
                         } else {
                             responseError(response);
                         }
+
+                        if (messageConsumer != null)
+                            messageConsumer.close();
+
+                        if (fileConsumer != null)
+                            fileConsumer.close();
                     }
                     loginCheck = false;
                     close(); // closing a session
@@ -140,6 +164,8 @@ public class CommandHandler implements Closeable {
                             System.out.println(((javax.jms.MapMessage) loginResponse).getString("message"));
                             loginCheck = true;
 
+                            checkMsg();
+                            chechFile();
 
                         } else { // user failed to login, check the "message" for details.
                             loginCheck = false;
@@ -175,29 +201,28 @@ public class CommandHandler implements Closeable {
                 case "msg": //command msg
                     System.out.println("You choose the command msg.");
                     if (checkLogin(loginCheck)) {
-//                        MapMessage msg = session.createMapMessage();
-//                        msg.setString("receiver", receiver);
-//                        msg.setString("message", String.join(" ", messageContent));
-//
-//                        Message response = getResponse(msg, QueueName.SEND_MSG);
-//
-//                        if (response instanceof MapMessage){
-//                            // print success message or error
-//                            System.out.println(((MapMessage) response).getString("message"));
-//                            if (!((MapMessage) response).getBoolean("success")) {
-//                                // when error
-//                                System.out.println("Please retry!");
-//                            }
-//                            System.out.println();
-//                        } else {
-//                            checkUnexpectedError(response);
-//                        }
-                    }
-                    break;
+                        System.out.print("Enter the login of receiver: ");
+                        String msgLogin = br.readLine(); //read login of receiver from user
+                        System.out.print("Enter the message: ");
+                        String msgText = br.readLine(); //read message from user
 
-                case "recMsg": //command receive message
-                    if (checkLogin(loginCheck)) {
+                        javax.jms.MapMessage msgUser = session.createMapMessage();
+                        msgUser.setString("receiver", msgLogin);
+                        msgUser.setString("message", msgText);
 
+                        javax.jms.Message responseMsg = getResponse(msgUser, "chat.sendMessage");
+
+                        if (responseMsg instanceof MapMessage){
+                            // print success message or error
+                            System.out.println(((javax.jms.MapMessage) responseMsg).getString("message"));
+                            if (!((javax.jms.MapMessage) responseMsg).getBoolean("success")) {
+                                // when error
+                                System.out.println("Please retry!");
+                            }
+                            System.out.println();
+                        } else {
+                            responseError(responseMsg);
+                        }
                     }
                     break;
 
@@ -211,15 +236,38 @@ public class CommandHandler implements Closeable {
                         System.out.print("Enter the path to file: ");
                         String filePath = br.readLine(); //read the path to file from user
 
+                        File file = new File(filePath);
+                        if (!file.isFile()) {
+                            System.out.println("Incorrect file path or it is not a file.\n");
+                            return;
+                        }
 
-                    }
-                    break;
+                        javax.jms.ObjectMessage fileObj = session.createObjectMessage();
 
-                case "recFile": //command receive file
-                    if (checkLogin(loginCheck)){
-                        System.out.println("You choose the command receive file.");
-                        String pathFile = "./receiveFile/"; //path to received file
+                        // convert a file to an byte array
+                        byte[] fileContent = Files.readAllBytes(file.toPath());
+                        
+                        // form a FileInfo to send
+                        FileInfo fileInfo = new FileInfo();
+                        fileInfo.setReceiver(fileReceiver);
+                        fileInfo.setFilename(fileName);
+                        fileInfo.setFileContent(fileContent);
 
+                        fileObj.setObject(fileInfo);
+
+                        javax.jms.Message response = getResponse(fileObj, "chat.sendFile");
+
+                        if (response instanceof javax.jms.MapMessage){
+                            // print success message or error
+                            System.out.println(((javax.jms.MapMessage) response).getString("message"));
+                            if (!((javax.jms.MapMessage) response).getBoolean("success")) {
+                                // when error
+                                System.out.println("Unexpected error sending file.");
+                            }
+                            System.out.println();
+                        } else {
+                            responseError(response);
+                        }
                     }
                     break;
 
@@ -232,8 +280,6 @@ public class CommandHandler implements Closeable {
                     System.out.println(" list - array with active user names;");
                     System.out.println(" msg - send message to user;");
                     System.out.println(" file - send file to user;");
-                    System.out.println(" recMsg - receive message for login user;");
-                    System.out.println(" recFile - receive file for login user.");
                     break;
 
                 default: //execute when wrong command
@@ -263,160 +309,65 @@ public class CommandHandler implements Closeable {
     }
 }
 
+class MessageReceiver implements MessageListener {
+    @Override public void onMessage(javax.jms.Message message) {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        try {
+            if(message instanceof javax.jms.MapMessage) {
+                javax.jms.MapMessage mapMsg = (MapMessage) message;
+                String messageText = null;
+                String sender = null;
 
-//class ReceiveTimer extends TimerTask {
-//    private String targetUrl;  //target URL of server
-//    private javax.ws.rs.client.Client client;  //object of class javax.ws.rs.client.Client
-//    private String userName;  //login name of current user
-//    //list string for msg
-//    public static String[] senderName = new String[50];
-//    public static String[] msgText = new String[50];
-//    //list string for file
-//    public static String[] senderFile = new String[50];
-//    public static String[] fileName= new String[50];
-//    public static String[] fileContent= new String[50];
-//
-//    private static int countMsg; //count of waiting message
-//    private static int countFile; //count of waiting file
-//
-//    private static ArrayList<String> current = new ArrayList<>(); //array list of current user
-//    private static ArrayList <String> old = new ArrayList<>(); //array list of old user
-//    private static int count = 0;
-//
-//    ReceiveTimer(javax.ws.rs.client.Client client, String targetUrl, String userName){ //constructor
-//        this.client = client;
-//        this.targetUrl = targetUrl;
-//        this.userName = userName;
-//    }
-//
-//    public static int getCountMsg(){ //getter of private field countMsg
-//        return countMsg;
-//    }
-//    public static void setCountMsg(int countMsg){ //setter of private field countMsg
-//        ReceiveTimer.countMsg = countMsg;
-//    }
-//    public static int getCountFile() { //getter of private field countFile
-//        return countFile;
-//    }
-//    public static void setCountFile(int countFile){ //setter of private field countFile
-//        ReceiveTimer.countFile = countFile;
-//    }
-//
-//    @Override
-//    public void run() { //run method of timer
-//        //check new message
-//        Response msgIdResponse = client.target(targetUrl+userName+"/messages") //command receive id of msg to server
-//                .request(MediaType.APPLICATION_JSON_TYPE).get(Response.class);
-//        if (msgIdResponse.getStatus() == 200) { //handle answer
-//            String responseAsString = msgIdResponse.readEntity(String.class);
-//            responseAsString = responseAsString.substring(10, responseAsString.length() - 2);
-//            responseAsString = responseAsString.replaceAll("\"", "");
-//            String[] stringIdMsg = responseAsString.split(",");
-//
-//            if (stringIdMsg.length > 0){ //new msg exist
-//                countMsg ++;
-//                System.out.println("You have unread message: " + countMsg + ". To see the message enter the command recMsg.");
-//                Response msgResponse = client.target(targetUrl+userName+"/messages/"+ stringIdMsg[0]) //command receive messages
-//                    .request(MediaType.APPLICATION_JSON_TYPE)
-//                    .get(Response.class);
-//                String msgResponseAsString = msgResponse.readEntity(String.class);
-//                String[] msgAndSenser = msgResponseAsString.split(",");
-//                msgText[countMsg - 1] = msgAndSenser[0];
-//                senderName[countMsg - 1] = msgAndSenser[1];
-//                msgText[countMsg - 1] = msgText[countMsg - 1].substring(12, msgText[countMsg - 1].length() - 1);
-//                senderName[countMsg - 1]= senderName[countMsg - 1].substring(10, senderName[countMsg - 1].length() - 2);
-//
-//                client.target(targetUrl+userName+"/messages/"+ stringIdMsg[0]) //delete read message
-//                        .request().delete();
-//            }
-//        }
-//
-//        //check new file
-//        Response fileIdResponse = client.target(targetUrl+userName+"/files")  //command receive id of files to server
-//                .request(MediaType.APPLICATION_JSON_TYPE).get(Response.class);
-//        if (fileIdResponse.getStatus() == 200) {
-//            String responseAsString = fileIdResponse.readEntity(String.class);
-//            responseAsString = responseAsString.substring(10, responseAsString.length() - 2);
-//            responseAsString = responseAsString.replaceAll("\"", "");
-//            String[] stringIdFile = responseAsString.split(",");
-//
-//            if (stringIdFile.length > 0) { //new file exist
-//                countFile++;
-//                System.out.println("You have waiting file: " + countFile + ". To see waiting file enter the command recFile.");
-//                Response msgResponse = client.target(targetUrl + userName + "/files/" + stringIdFile[0]) //command receive file
-//                        .request(MediaType.APPLICATION_JSON_TYPE)
-//                        .get(Response.class);
-//                String fileResponseAsString = msgResponse.readEntity(String.class);
-//                String[] fileAndSenser = fileResponseAsString.split(",");
-//
-//                senderFile[countFile-1] = fileAndSenser[2];
-//                fileName[countFile-1] = fileAndSenser[1];
-//                fileContent[countFile-1] = fileAndSenser[0];
-//                senderFile[countFile-1] = senderFile[countFile-1].substring(10, senderFile[countFile-1].length() - 2);
-//                fileName[countFile-1] =  fileName[countFile-1].substring(12, fileName[countFile-1].length() - 1);
-//                fileContent[countFile-1] =  fileContent[countFile-1].substring(12, fileContent[countFile-1].length() - 1);
-//
-//                String fileContentString = fileContent[countFile-1];
-//                java.util.Base64.Decoder decoder = java.util.Base64.getDecoder();
-//                byte[] decodedContent = decoder.decode(fileContentString);
-//                fileContent[countFile-1] = new String(decodedContent);
-//
-//                client.target(targetUrl + userName + "/files/" + stringIdFile[0])
-//                        .request().delete();
-//            }
-//        }
-//
-//        //check new or log out user
-//        List<String> listUser = null;
-//        Response listResponse = client.target(targetUrl + "users"). //command to get list of user
-//                request(MediaType.APPLICATION_JSON_TYPE)
-//                .get(Response.class);
-//        if (listResponse.getStatus() == Response.Status.OK.getStatusCode()) {
-//            String responseAsString = listResponse.readEntity(String.class);
-//            try{
-//                responseAsString = responseAsString.substring(10, responseAsString.length() - 2);
-//            } catch (StringIndexOutOfBoundsException ignored){}
-//            responseAsString = responseAsString.replaceAll("\"", "");
-//            String[] stringUserList = responseAsString.split(",");
-//            listUser = Arrays.asList(stringUserList);
-//        }
-//
-//        assert false;
-//        String[] listUsers = listUser.toArray(new String[0]);
-//        if (count == 0){ //record users to array list on first iteration
-//            assert listUsers != null;
-//            for(String i: listUsers){
-//                current.add(i);
-//                old.add(i);
-//            }
-//        } else { //second and subsequent iterations
-//            current.clear();
-//            assert listUsers != null;
-//            Collections.addAll(current, listUsers);
-//
-//            if(current.size() > old.size()){ //new user
-//                current.removeAll(old);
-//                System.out.println("The user " + current.get(0) + " connected to the server.");
-//
-//                current.clear(); //clear array list
-//                old.clear();
-//                for(String i: listUsers){
-//                    current.add(i);
-//                    old.add(i);
-//                }
-//
-//            } else if (current.size() < old.size()){ //logout user
-//                old.removeAll(current);
-//                System.out.println("The user " + old.get(0) + " disconnected from server.");
-//                old.clear(); //clear array list
-//                current.clear();
-//                for(String i: listUsers) {
-//                    current.add(i);
-//                    old.add(i);
-//                }
-//            }
-//        }
-//        if (count == 0) //detect first iteration
-//            count++;
-//    }
-//}
+                sender = mapMsg.getString("sender");
+                messageText = mapMsg.getString("message");
+
+                System.out.println("You have a new message:");
+                System.out.println(" Sender: " + sender);
+                System.out.println(" Message: " + messageText);
+            }
+        } catch (JMSException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class FileReceiver implements MessageListener {
+    @Override
+    public void onMessage(javax.jms.Message message) {
+        String folderPath = "./receiveFile";
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        if (message instanceof ObjectMessage) {
+            javax.jms.ObjectMessage objMsg = (javax.jms.ObjectMessage)message;
+            try {
+                FileInfo fileInfo = (FileInfo) objMsg.getObject();
+
+                System.out.println("You have a new file:");
+                System.out.println(" File sender: " + fileInfo.getSender() + "");
+                System.out.println(" Name of file: " + fileInfo.getFilename());
+
+                // check if there is a folder to save the files
+                File folder = new File(folderPath);
+                if (!folder.exists()) {
+                    folder.mkdir();
+                }
+
+                fileInfo.saveFileTo(folder);
+                System.out.println(" File " + fileInfo.getFilename() + " was saved at path " + folderPath + "/" + fileInfo.getFilename());
+
+            } catch (JMSException | IOException error) {
+                System.out.println(error.getMessage());
+            }
+        }
+    }
+}
+

@@ -2,6 +2,7 @@ package lpi.client.mq;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 import javax.jms.JMSException;
 
 public class Connect implements Closeable {
@@ -10,6 +11,7 @@ public class Connect implements Closeable {
     private String targetUrl;
     private javax.jms.Connection connection;
     javax.jms.Session session;
+    javax.jms.Session sessionListener;
 
     Connect(String[] args) { //constructor
         if (args.length == 1) { //wrong argument
@@ -25,15 +27,19 @@ public class Connect implements Closeable {
 
         org.apache.activemq.ActiveMQConnectionFactory connectionActiveMQ = new org.apache.activemq.ActiveMQConnectionFactory(targetUrl);
 
+        connectionActiveMQ.setTrustedPackages(Arrays.asList("lpi.server.mq"));
+
         boolean isTransact = false; // no transactions will be used.
         int ackMode = javax.jms.Session.AUTO_ACKNOWLEDGE; // automatically acknowledge.
 
         connection = connectionActiveMQ.createConnection();
         connection.start();
 
-        session = connection.createSession(isTransact, ackMode);
 
-        CommandHandler commandHandle = new CommandHandler(session, connection); //create object of class CommandHandler
+
+        session = connection.createSession(isTransact, ackMode);
+        sessionListener = connection.createSession(isTransact, ackMode);
+        CommandHandler commandHandle = new CommandHandler(session, connection, sessionListener); //create object of class CommandHandler
         commandHandle.run(); //run method of CommandHandler
 
     }
