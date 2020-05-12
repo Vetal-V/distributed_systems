@@ -3,6 +3,8 @@ package lpi.client.mq;
 import javax.jms.*;
 import java.io.*;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.Instant;
 import javax.jms.JMSException;
 import javax.jms.TextMessage;
 import lpi.server.mq.FileInfo;
@@ -11,11 +13,14 @@ public class CommandHandler implements Closeable {
 
     private boolean loginCheck = false; //boolean variable for checking log in
 
-    private javax.jms.Session session;
-    private javax.jms.Session sessionListener;
-    private javax.jms.Connection connection;
-    private MessageConsumer messageConsumer;
-    private MessageConsumer fileConsumer;
+    private javax.jms.Session session; //session for current user
+    private javax.jms.Session sessionListener; //session for check file and msg
+    private javax.jms.Connection connection; //current connection
+    private MessageConsumer messageConsumer; //MessageConsumer for get msg
+    private MessageConsumer fileConsumer; //MessageConsumer for get file
+    private String currentUsername;  //username of current user
+
+    private Instant lastAction; //instant for get time last action
 
     CommandHandler(javax.jms.Session session, javax.jms.Connection connection, javax.jms.Session sessionListener){ //constructor of class CommandHandler
         this.session = session;
@@ -23,7 +28,7 @@ public class CommandHandler implements Closeable {
         this.sessionListener = sessionListener;
     }
 
-    private synchronized javax.jms.Message getResponse(javax.jms.Message msg, String queueName) throws JMSException {
+    private synchronized javax.jms.Message getResponse(javax.jms.Message msg, String queueName) throws JMSException { //method for sending and receiving response
         // create an object specifying the Destination to which the message will be sent:
         javax.jms.Destination targetQueue = session.createQueue(queueName);
         // create an object specifying the Destination where the response will be received:
@@ -36,21 +41,21 @@ public class CommandHandler implements Closeable {
         producer.send(msg); // send the message using producer:
         javax.jms.Message replyMsg = consumer.receive(1500); // await the reply using consumer:
 
-        consumer.close();
-        producer.close();
+        consumer.close(); //close MessageProducer consumer
+        producer.close(); //close MessageProducer producer
 
         return replyMsg;
     }
 
     public static void responseError(Message responseError) throws JMSException { //method to handle error response
         System.out.println("Unexpected error!");
-        if (responseError instanceof TextMessage) { // expect the text message as the content
-            String content = ((TextMessage) responseError).getText(); // obtaining content
+        if (responseError instanceof TextMessage) { //check the text message as the content
+            String content = ((TextMessage) responseError).getText(); //get content
             System.out.println(content);
         }
 
-        if (responseError instanceof MapMessage) { // expect the text message as the content
-            String content = ((MapMessage) responseError).getString("message"); // obtaining content
+        if (responseError instanceof MapMessage) { //check the text message as the content
+            String content = ((MapMessage) responseError).getString("message"); //get content
             System.out.println(content);
         }
         System.out.println();
@@ -65,18 +70,80 @@ public class CommandHandler implements Closeable {
         }
     }
 
-    public void checkMsg() throws JMSException {
+    public void checkMsg() throws JMSException { //check new messages
         Destination queue = sessionListener.createQueue("chat.messages");
         messageConsumer = sessionListener.createConsumer(queue);
-        messageConsumer.setMessageListener(new MessageReceiver());
+        messageConsumer.setMessageListener(new MessageReceiver()); //implement MessageListener of class MessageReceiver
     }
 
     public void chechFile() throws JMSException {
         Destination queue = sessionListener.createQueue("chat.files");
         fileConsumer = sessionListener.createConsumer(queue);
-        fileConsumer.setMessageListener(new FileReceiver());
+        fileConsumer.setMessageListener(new FileReceiver()); //implement MessageListener of class FileReceiver
     }
 
+    public void checkTimeOut(){
+        Thread threadAFK = new Thread(() -> {
+            while (true) { //wait 5 min
+                try {
+                    Thread.sleep(20 *  1000);
+
+                    Instant instantNow = Instant.now();
+                    Duration timeElapsed = Duration.between(lastAction, instantNow); //calculate the difference between instant
+
+                    if (timeElapsed.toMinutes() >= 5) { //set time to begin AFK mode
+                        break;
+                    }
+
+                    Message msg = session.createMessage(); // an empty message
+                    getResponse(msg, "chat.diag.ping"); //ping to server for threatAFK
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+
+            System.out.println("You are AFK. Message about is successfully send to other user.");
+            try {
+                //get list of active user
+                String[] users = new String[0];
+                Message msgList = session.createMessage();
+                Message response = getResponse(msgList, "chat.listUsers");
+
+                if (response instanceof ObjectMessage) { //handle response of list users
+                    Serializable obj = ((ObjectMessage) response).getObject();
+                    if (obj instanceof String[]) {
+                        users = (String[]) obj;
+                    }
+                }
+
+                for (String user : users) { //send message to all active user
+                    if (user.equals(currentUsername))
+                        continue;
+
+                    while (true) {
+                        String messageContent = "Sorry, I'm AFK, will answer ASAP";
+
+                        MapMessage msg = session.createMapMessage();
+                        msg.setString("receiver", user);
+                        msg.setString("message", messageContent);
+
+                        response = getResponse(msg, "chat.sendMessage");
+                        if (response instanceof MapMessage) {
+                            // when the message is successfully sent
+                            if (((MapMessage) response).getBoolean("success"))
+                                break;
+                        }
+                    }
+                }
+
+                loginCheck = false;
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        });
+        threadAFK.setDaemon(true); //create a daemon thread
+        threadAFK.start(); //start thread
+    }
 
     void run() throws IOException, JMSException { //method run of class CommandHandler
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));  //input buffer stream from user
@@ -85,11 +152,11 @@ public class CommandHandler implements Closeable {
         while (ifLoop) { //loop for entering command
             System.out.println("\nEnter the command (help - list of available commands): ");
             String command = br.readLine(); //read command of user
-
+            lastAction = Instant.now();
             switch (command) {
                 case "exit": //complete client execution
                     ifLoop = false;
-                    if (checkLogin(loginCheck)) {
+                    if (checkLogin(loginCheck)) { //log out user on server
                         Message msg = session.createMessage(); // an empty message
                         Message response = getResponse(msg, "chat.exit");
 
@@ -106,7 +173,7 @@ public class CommandHandler implements Closeable {
                             fileConsumer.close();
                     }
                     loginCheck = false;
-                    close(); // closing a session
+                    close(); // closing a connection
                     break;
 
                 case "ping": //command ping
@@ -120,11 +187,11 @@ public class CommandHandler implements Closeable {
                     }
 
                     assert msg != null;
-                    javax.jms.Message pingResponse = getResponse(msg, "chat.diag.ping");
+                    javax.jms.Message pingResponse = getResponse(msg, "chat.diag.ping"); //ping to server
 
-                    if (!(pingResponse instanceof TextMessage)){
-                        System.out.println("Successfully ping.\n");
-                    } else {
+                    if (!(pingResponse instanceof TextMessage)){ //successfully ping
+                        System.out.println("Successfully ping.");
+                    } else { //handle error
                         responseError(pingResponse);
                     }
                     break;
@@ -134,13 +201,12 @@ public class CommandHandler implements Closeable {
                     System.out.print(" Enter the echo text: ");
                     String echoText = br.readLine(); //read echo text from user
 
-                    TextMessage msgEcho = session.createTextMessage(echoText); // a message that contains a string
+                    TextMessage msgEcho = session.createTextMessage(echoText); //message that contains a string echo
 
                     javax.jms.Message echoResponse = getResponse(msgEcho, "chat.diag.echo");
 
-                    if (echoResponse instanceof TextMessage) {
-                        // expect the text message as the content
-                        String content = ((TextMessage) echoResponse).getText(); // obtaining content
+                    if (echoResponse instanceof TextMessage) { //check the text message as the content
+                        String content = ((TextMessage) echoResponse).getText(); //get content
                         System.out.println("Received from server: " + content);
                     } else { //unexpected error
                         System.out.println("Unexpected message type: " + echoResponse.getClass() );
@@ -158,20 +224,20 @@ public class CommandHandler implements Closeable {
                     loginRequest.setString("login", loginName);
                     loginRequest.setString("password", loginPass);
 
-                    javax.jms.Message loginResponse = getResponse(loginRequest, "chat.login");
+                    javax.jms.Message loginResponse = getResponse(loginRequest, "chat.login"); //login on server
                     if (loginResponse instanceof MapMessage) {
-                        if (((javax.jms.MapMessage) loginResponse).getBoolean("success")) {// successfully logged in
+                        if (((javax.jms.MapMessage) loginResponse).getBoolean("success")) {// successfully login
                             System.out.println(((javax.jms.MapMessage) loginResponse).getString("message"));
                             loginCheck = true;
-
-                            checkMsg();
-                            chechFile();
-
+                            currentUsername = loginName;
+                            checkMsg(); //start checking msg
+                            chechFile(); //start checking files
+                            checkTimeOut(); //start checking AFK
                         } else { // user failed to login, check the "message" for details.
                             loginCheck = false;
                             System.out.println("Failed to login: " + ((javax.jms.MapMessage) loginResponse).getString("message"));
                         }
-                    } else
+                    } else //handle error
                         responseError(loginResponse);
                     break;
 
@@ -186,13 +252,13 @@ public class CommandHandler implements Closeable {
                         }
 
                         assert msgList != null;
-                        javax.jms.Message listResponse = getResponse(msgList, "chat.listUsers");
-                        Serializable objList = ((ObjectMessage)listResponse).getObject();
+                        javax.jms.Message listResponse = getResponse(msgList, "chat.listUsers"); //list command to server
+                        Serializable objList = ((ObjectMessage)listResponse).getObject(); //serialize response
                         if (objList != null && objList instanceof String[]) {
                             String[] users = (String[])objList;
                             System.out.print("List of user names: ");
                             for (String s : users) System.out.print(s + " ");
-                        } else { // no, there’s not a list of objects, handle error.
+                        } else { //handle error.
                             System.out.println("Unexpected content: " + objList);
                         }
                     }
@@ -210,17 +276,15 @@ public class CommandHandler implements Closeable {
                         msgUser.setString("receiver", msgLogin);
                         msgUser.setString("message", msgText);
 
-                        javax.jms.Message responseMsg = getResponse(msgUser, "chat.sendMessage");
+                        javax.jms.Message responseMsg = getResponse(msgUser, "chat.sendMessage"); //send message to server
 
                         if (responseMsg instanceof MapMessage){
-                            // print success message or error
-                            System.out.println(((javax.jms.MapMessage) responseMsg).getString("message"));
-                            if (!((javax.jms.MapMessage) responseMsg).getBoolean("success")) {
-                                // when error
+                            System.out.println(((javax.jms.MapMessage) responseMsg).getString("message")); //print response message
+                            if (!((javax.jms.MapMessage) responseMsg).getBoolean("success")) { //check existence of error
                                 System.out.println("Please retry!");
                             }
                             System.out.println();
-                        } else {
+                        } else { //handle error
                             responseError(responseMsg);
                         }
                     }
@@ -237,36 +301,33 @@ public class CommandHandler implements Closeable {
                         String filePath = br.readLine(); //read the path to file from user
 
                         File file = new File(filePath);
-                        if (!file.isFile()) {
+                        if (!file.isFile()) { //check existence of file
                             System.out.println("Incorrect file path or it is not a file.\n");
                             return;
                         }
 
-                        javax.jms.ObjectMessage fileObj = session.createObjectMessage();
+                        javax.jms.ObjectMessage fileObj = session.createObjectMessage(); //create object for file
 
-                        // convert a file to an byte array
-                        byte[] fileContent = Files.readAllBytes(file.toPath());
-                        
-                        // form a FileInfo to send
+                        byte[] fileContent = Files.readAllBytes(file.toPath()); //content of file to byte array
+
+                        //set field of FileInfo
                         FileInfo fileInfo = new FileInfo();
                         fileInfo.setReceiver(fileReceiver);
                         fileInfo.setFilename(fileName);
                         fileInfo.setFileContent(fileContent);
 
-                        fileObj.setObject(fileInfo);
+                        fileObj.setObject(fileInfo); //set object for file
 
-                        javax.jms.Message response = getResponse(fileObj, "chat.sendFile");
+                        javax.jms.Message response = getResponse(fileObj, "chat.sendFile"); //send file to server
 
                         if (response instanceof javax.jms.MapMessage){
-                            // print success message or error
-                            System.out.println(((javax.jms.MapMessage) response).getString("message"));
-                            if (!((javax.jms.MapMessage) response).getBoolean("success")) {
-                                // when error
+                            System.out.println(((javax.jms.MapMessage) response).getString("message")); //print response message
+                            if (!((javax.jms.MapMessage) response).getBoolean("success")) { //check existence of error
                                 System.out.println("Unexpected error sending file.");
                             }
                             System.out.println();
                         } else {
-                            responseError(response);
+                            responseError(response); //handle error
                         }
                     }
                     break;
@@ -289,7 +350,7 @@ public class CommandHandler implements Closeable {
     }
 
     @Override
-    public void close() {
+    public void close() { //method of Closeable
         if (session != null){
             try {
                 session.close();
@@ -309,15 +370,15 @@ public class CommandHandler implements Closeable {
     }
 }
 
-class MessageReceiver implements MessageListener {
+class MessageReceiver implements MessageListener { //class of MessageListener for MessageReceiver
     @Override public void onMessage(javax.jms.Message message) {
-        try {
+        try { //time out 1 second
             Thread.sleep(1000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         try {
-            if(message instanceof javax.jms.MapMessage) {
+            if(message instanceof javax.jms.MapMessage) { //message exist
                 javax.jms.MapMessage mapMsg = (MapMessage) message;
                 String messageText = null;
                 String sender = null;
@@ -335,18 +396,18 @@ class MessageReceiver implements MessageListener {
     }
 }
 
-class FileReceiver implements MessageListener {
+class FileReceiver implements MessageListener { //class of MessageListener for FileReceiver
     @Override
     public void onMessage(javax.jms.Message message) {
         String folderPath = "./receiveFile";
 
-        try {
+        try { //time out 1 second
             Thread.sleep(1000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        if (message instanceof ObjectMessage) {
+        if (message instanceof ObjectMessage) { //file exist
             javax.jms.ObjectMessage objMsg = (javax.jms.ObjectMessage)message;
             try {
                 FileInfo fileInfo = (FileInfo) objMsg.getObject();
@@ -357,11 +418,11 @@ class FileReceiver implements MessageListener {
 
                 // check if there is a folder to save the files
                 File folder = new File(folderPath);
-                if (!folder.exists()) {
+                if (!folder.exists()) { //create folder if it don't exist
                     folder.mkdir();
                 }
 
-                fileInfo.saveFileTo(folder);
+                fileInfo.saveFileTo(folder); //save file to folder
                 System.out.println(" File " + fileInfo.getFilename() + " was saved at path " + folderPath + "/" + fileInfo.getFilename());
 
             } catch (JMSException | IOException error) {
