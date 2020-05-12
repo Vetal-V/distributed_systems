@@ -35,7 +35,7 @@
          You choose the command login.
          Enter the login: user1
          Enter the password: pass
-         New user registered.
+         Registered successfully
         ```
     - `list` - array with active user names (no parameters);
     - `msg` - send message to user. After entering the command, the program will ask you to enter name of receiver and test of message. User with this name immediately receive notification about new message (this user must exist):
@@ -43,9 +43,14 @@
         Enter the command (help - list of available commands):
         msg
          You choose the command msg.
-         Enter the login of receiver: user2
+         Enter the login of receiver: user1
          Enter the message: Hi! How are you?
-         The message is processed.
+         The message was sent successfully.
+      
+         Enter the command (help - list of available commands):
+          You have a new message:
+           Sender: user1
+           Message: Hi! How are you?
         ```
     - `file` - send file to user. After entering the command, the program will ask you to enter name of receiver, name of file and path to file (for example file.txt with the same relative path file.txt). User with this name immediately receive notification about waiting file:
         ```
@@ -55,31 +60,16 @@
          Enter the login of receiver: user2
          Enter the name of file: file.txt
          Enter the path to file: ./file.txt
-         The file is processed.
-        ```
-    - `recMsg` - receive message for login user (after logging in to the user2 account, I received a notification about the file and the messages received. Account user2 must be created):
-        ```
+         The file was sent successfully.
+      
         Enter the command (help - list of available commands):
-        recMsg
-         You choose the command receive message.
-         You have messages:
-          Sender: user1
-          Message: Hi! How are you?
-        ```
-    - `recFile` - receive file for login user:
-        ```
-        Enter the command (help - list of available commands):
-        You have waiting file: 1. To see waiting file enter the command recFile.
-        You have unread message: 1. To see the message enter the command recMsg.
-        recFile
-         You choose the command receive file.
-         You have waiting file:
-          Sender of file: user1
-          Filename: file.txt
-         The content was written to a file file.txt at path ./receiverFile/file.txt
+         You have a new file:
+          File sender: user1
+          Name of file: file.txt
+          File file.txt was saved at path ./receiveFile/file.txt
         ```
       
-5. Application prints when some new user logs in to the server:
+5. Application answers that user is away to an incoming message when the user is not specifying any commands longer than for 5 minutes and a new message arrives:
     - To check it you need to log in to several accounts from different terminals:
     ``` 
     ~~~Terminal_1~~~
@@ -89,7 +79,7 @@
      Enter the login: user1
      Enter the password: pass
      Server answer:
-    New user registered.
+    Registered successfully
     ```
     ```
     ~~~Terminal_2~~~
@@ -99,10 +89,18 @@
      Enter the login: user2
      Enter the password: pass
      Server answer:
-    New user registered.
+    Registered successfully
     ```
+   - Wait more five minutes is terminal 1, while execute command in terminar 2:
     ```
     ~~~Terminal_1~~~
     Enter the command (help - list of available commands):
-    The user user2 connected to the server.
+    You are AFK. Message about is successfully send to other user.
+    ```
+    ```
+    ~~~Terminal_2~~~
+    Enter the command (help - list of available commands):
+    You have a new message:
+     Sender: user1
+     Message: Sorry, I'm AFK, will answer ASAP
     ```
